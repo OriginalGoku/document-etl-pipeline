@@ -13,6 +13,7 @@ dist/
 # Virtual environments
 .venv/
 venv/
+myenv/
 
 # Repo index (local cache, regenerable from source)
 .repo-index/
@@ -20,8 +21,10 @@ venv/
 # Secrets
 .env
 
+
 # Graphify
 graphify-out
 
 # Serena
 .serena
+myenv/
