@@ -4,11 +4,10 @@ import argparse
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from field_extractor import ExtractionConfig, FieldExtractor
-
 from classifier import ClassifierConfig, DocumentClassifier
-from ocr_engine import OcrConfig, OcrEngine
-from pdf_to_jpg import PdfConversionConfig, PdfToJpgConverter
+from exctractor import ExtractionConfig, FieldExtractor
+from ocr import OcrConfig, OcrEngine
+from convertor import PdfConversionConfig, PdfToJpgConverter
 from system_prompts import ClassificationOption
 
 
@@ -155,28 +154,36 @@ def parse_csv_list(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def parse_classification_options(
-    classes_value: str | None,
-    descriptions_value: str | None,
-) -> list[ClassificationOption]:
-    labels = parse_csv_list(classes_value)
-    descriptions_map: dict[str, str] = {}
+def parse_classification_options(value: str | None) -> list[ClassificationOption]:
+    if not value:
+        return []
 
-    if descriptions_value:
-        for raw_part in descriptions_value.split(";"):
-            part = raw_part.strip()
-            if not part or "=" not in part:
-                continue
-            key, value = part.split("=", 1)
-            key = key.strip()
-            value = value.strip()
-            if key and value:
-                descriptions_map[key] = value
+    options: list[ClassificationOption] = []
 
-    return [
-        ClassificationOption(label=label, description=descriptions_map.get(label))
-        for label in labels
-    ]
+    for raw_part in value.split(";"):
+        part = raw_part.strip()
+        if not part:
+            continue
+
+        if "=" in part:
+            label, description = part.split("=", 1)
+            label = label.strip()
+            description = description.strip()
+        else:
+            label = part
+            description = None
+
+        if not label:
+            continue
+
+        options.append(
+            ClassificationOption(
+                label=label,
+                description=description or None,
+            )
+        )
+
+    return options
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -215,18 +222,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help='Comma-separated OCR hint list, e.g. "invoice,receipt,proof of payment"',
     )
     parser.add_argument(
-        "--classes",
-        type=str,
-        default="",
-        help='Comma-separated class labels, e.g. "invoice,proof_of_payment,receipt"',
-    )
-    parser.add_argument(
-        "--class-descriptions",
+        "--class-options",
         type=str,
         default="",
         help=(
-            "Semicolon-separated label descriptions, "
-            'e.g. "invoice=Vendor billing document;proof_of_payment=Bank statements showing flow of funds"'
+            "Semicolon-separated classification options. "
+            'Each option can be either "label" or "label=description". '
+            "Example: "
+            '"invoice=Vendor billing document;'
+            "proof_of_payment=Bank statements showing flow of funds;"
+            'receipt"'
         ),
     )
     parser.add_argument(
@@ -247,6 +252,18 @@ def main() -> None:
     parser = build_arg_parser()
     args = parser.parse_args()
 
+    if args.mode == "classify" and not args.class_options.strip():
+        parser.error("--class-options is required when --mode classify")
+
+    if args.mode == "extract" and not args.fields.strip():
+        parser.error("--fields is required when --mode extract")
+
+    if args.mode == "all":
+        if not args.class_options.strip():
+            parser.error("--class-options is required when --mode all")
+        if not args.fields.strip():
+            parser.error("--fields is required when --mode all")
+            
     folder = Path(args.folder)
     if not folder.exists():
         raise FileNotFoundError(f"Folder not found: {folder}")
@@ -261,7 +278,7 @@ def main() -> None:
         model=args.model,
         ocr_output_type=args.ocr_output_type,
         document_type_hints=parse_csv_list(args.doc_hints),
-        classes=parse_classification_options(args.classes, args.class_descriptions),
+        classes=parse_classification_options(args.class_options),
         fields=parse_csv_list(args.fields),
     )
 
@@ -272,6 +289,7 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
+
 # Convert PDF to JPG only
 # python app.py "/Users/god/Backup from Old Laptop/CEU Property/Expenses/2025/Jan 2025" --mode convert
 #
@@ -280,3 +298,8 @@ if __name__ == "__main__":
 #
 # Both
 # python app.py "/Users/god/Backup from Old Laptop/CEU Property/Expenses/2025/Jan 2025" --mode both
+
+# Classification
+# python app.py "/Users/god/Backup from Old Laptop/CEU Property/Expenses/2025/Mar 2024" \
+#   --mode classify \
+#   --class-options "invoice=Vendor billing document;proof_of_payment=Bank statements showing flow of funds"

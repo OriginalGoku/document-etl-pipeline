@@ -154,7 +154,7 @@ python app.py "/path/to/folder" --mode ocr --ocr-output-type txt --doc-hints "in
 ### Classify documents
 
 ```bash
-python app.py "/path/to/folder" --mode classify --classes "invoice,proof_of_payment,receipt" --class-descriptions "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller"
+python app.py "/path/to/folder" --mode classify --class-options "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller"
 ```
 
 ### Extract fields
@@ -166,7 +166,7 @@ python app.py "/path/to/folder" --mode extract --fields "Date,HST,Subtotal,Total
 ### Run full pipeline
 
 ```bash
-python app.py "/path/to/folder" --mode all --doc-hints "invoice,receipt,proof of payment" --classes "invoice,proof_of_payment,receipt" --class-descriptions "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller" --fields "Date,HST,Subtotal,Total,Description"
+python app.py "/path/to/folder" --mode all --doc-hints "invoice,receipt,proof of payment" --class-options "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller" --fields "Date,HST,Subtotal,Total,Description"
 ```
 
 ## CLI options
@@ -200,8 +200,11 @@ python app.py "/path/to/folder" --mode all --doc-hints "invoice,receipt,proof of
 
 ### Classification
 
-- `--classes "invoice,proof_of_payment,receipt"`
-- `--class-descriptions "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller"`
+- `--class-options "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller"`
+
+Each classification option can be either:
+- `label`
+- `label=description`
 
 ### Extraction
 
