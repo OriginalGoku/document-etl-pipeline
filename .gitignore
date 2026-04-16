@@ -1,0 +1,27 @@
+.DS_Store
+.claude/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# Repo index (local cache, regenerable from source)
+.repo-index/
+
+# Secrets
+.env
+
+# Graphify
+graphify-out
+
+# Serena
+.serena
