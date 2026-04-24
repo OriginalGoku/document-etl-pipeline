@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Iterable
 
 import ollama
-from prompts.system_prompts import SystemPrompts
+
+from document_etl_pipeline.prompts import SystemPrompts
 
 
 @dataclass(slots=True)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import ollama
 
-from prompts.system_prompts import ClassificationOption, SystemPrompts
+from document_etl_pipeline.prompts import ClassificationOption, SystemPrompts
 
 
 @dataclass(slots=True)

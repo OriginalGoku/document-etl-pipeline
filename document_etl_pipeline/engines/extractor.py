@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import ollama
-from prompts.system_prompts import SystemPrompts
+
+from document_etl_pipeline.prompts import SystemPrompts
 
 
 @dataclass(slots=True)

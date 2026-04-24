@@ -3,14 +3,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from document_etl_pipeline.cli.base import BaseCliCommand
 from document_etl_pipeline.engines.classifier import (
     ClassifierConfig,
     DocumentClassifier,
 )
 from document_etl_pipeline.engines.ocr import OcrEngine
 from document_etl_pipeline.prompts.system_prompts import ClassificationOption
-
-from document_etl_pipeline.cli.base import BaseCliCommand
 
 
 class ClassifyCliCommand(BaseCliCommand):
@@ -29,17 +28,14 @@ class ClassifyCliCommand(BaseCliCommand):
             help='Ollama model name. Default: "gemma4:e4b"',
         )
         parser.add_argument(
-            "--classes",
+            "--class-options",
             required=True,
-            help='Comma-separated class labels, e.g. "invoice,proof_of_payment,receipt"',
-        )
-        parser.add_argument(
-            "--class-descriptions",
-            default="",
             help=(
-                "Semicolon-separated label descriptions, "
-                'e.g. "invoice=Vendor-issued billing document;'
-                'proof_of_payment=Bank statements showing flow of funds"'
+                "Semicolon-separated classification options. "
+                'Examples: "invoice;proof_of_payment;receipt" or '
+                '"invoice=Vendor-issued billing document;'
+                "proof_of_payment=Bank statements showing flow of funds;"
+                'receipt=Proof of purchase issued by seller"'
             ),
         )
         parser.add_argument(
@@ -62,10 +58,7 @@ class ClassifyCliCommand(BaseCliCommand):
             self.print_success("No JPG/JPEG files found.")
             return 0
 
-        options = self._parse_classification_options(
-            classes_value=args.classes,
-            descriptions_value=args.class_descriptions,
-        )
+        options = self._parse_classification_options(args.class_options)
 
         classifier = DocumentClassifier(
             ClassifierConfig(
@@ -97,24 +90,34 @@ class ClassifyCliCommand(BaseCliCommand):
 
     def _parse_classification_options(
         self,
-        classes_value: str,
-        descriptions_value: str | None,
+        class_options_value: str,
     ) -> list[ClassificationOption]:
-        labels = self.parse_csv_list(classes_value)
-        descriptions_map: dict[str, str] = {}
+        options: list[ClassificationOption] = []
 
-        if descriptions_value:
-            for raw_part in descriptions_value.split(";"):
-                part = raw_part.strip()
-                if not part or "=" not in part:
-                    continue
-                key, value = part.split("=", 1)
-                key = key.strip()
-                value = value.strip()
-                if key and value:
-                    descriptions_map[key] = value
+        for raw_part in class_options_value.split(";"):
+            part = raw_part.strip()
+            if not part:
+                continue
 
-        return [
-            ClassificationOption(label=label, description=descriptions_map.get(label))
-            for label in labels
-        ]
+            if "=" in part:
+                label, description = part.split("=", 1)
+                label = label.strip()
+                description = description.strip()
+            else:
+                label = part
+                description = None
+
+            if not label:
+                continue
+
+            options.append(
+                ClassificationOption(
+                    label=label,
+                    description=description or None,
+                )
+            )
+
+        if not options:
+            raise ValueError("At least one valid classification option is required.")
+
+        return options

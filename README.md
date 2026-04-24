@@ -6,77 +6,85 @@ Local-first document OCR, classification, extraction, and ETL pipeline.
 
 ## Overview
 
-This project is a modular document-processing pipeline designed for engineering use cases where clear stage boundaries, reusable artifacts, and low dependency overhead matter more than product branding or marketplace discoverability.
+This project is a modular document-processing pipeline designed for engineering use cases where clear stage boundaries, reusable artifacts, and low dependency overhead matter more than branding or marketplace discoverability.
 
-It supports these core stages:
+It currently supports these core capabilities:
 
-- PDF to JPG conversion
-- OCR transcription
-- Document classification
-- Field extraction
+- convert PDF files into JPG page images
+- run OCR on JPG/JPEG images
+- classify documents using a configurable set of labels
+- extract caller-defined fields from documents
 
-Each stage can run independently or as part of a full pipeline. Outputs are written as sidecar files next to source images so intermediate artifacts remain inspectable, stable, and reusable by downstream tools or future agents.
+Each capability is exposed as its own CLI command. Outputs are written as sidecar files next to source images so intermediate artifacts remain inspectable and reusable.
+
+## Current package structure
+
+```text
+document_etl_pipeline/
+  __init__.py
+  __main__.py
+  cli/
+    __init__.py
+    base.py
+    main.py
+    ocr.py
+    classify.py
+    extract.py
+    convert.py
+  engines/
+    __init__.py
+    ocr.py
+    classifier.py
+    extractor.py
+    converter.py
+  prompts/
+    __init__.py
+    system_prompts.py
+```
 
 ## Design goals
 
-- Local-first execution
-- Minimal external dependencies
-- Clear ETL-style pipeline stages
-- Reusable intermediate artifacts
-- Prompt centralization
-- Model/vendor agnostic architecture
-- Future compatibility with agentic tool invocation from systems like Claude Code or Codex
+- local-first execution
+- minimal dependencies
+- small, composable tools
+- sidecar-based outputs
+- model/vendor agnostic architecture
+- clean CLI contracts for use from coding agents
+- future expansion into more advanced pipelines
 
-## Repository structure
+## Core concepts
 
-- `app.py`  
-  Main CLI entrypoint. Traverses folders and orchestrates pipeline stages.
+### Engines
+Execution logic lives in `engines/`.
 
-- `pdf_to_jpg.py`  
-  Converts PDFs into one JPG per page.
+Current engines:
+- `ocr.py`
+- `classifier.py`
+- `extractor.py`
+- `converter.py`
 
-- `ocr_engine.py`  
-  Runs OCR on JPG images and saves `.ocr.txt` or `.ocr.md` sidecar files.
+These are the Python implementation layer.
 
-- `classifier.py`  
-  Classifies documents using OCR text when available, otherwise falls back to the source image.
+### CLI
+CLI commands live in `cli/`.
 
-- `field_extractor.py`  
-  Extracts requested fields from OCR text when available, otherwise falls back to the source image.
+Current commands:
+- `convert`
+- `ocr`
+- `classify`
+- `extract`
 
-- `system_prompts.py`  
-  Central location for all system prompt builders and prompt-related data structures.
+Each command is implemented as a class inheriting from a shared base command in `cli/base.py`.
 
-- `ARCHITECTURE.md`  
-  Detailed architectural notes and rationale.
+### Prompts
+Prompt builders and prompt-related data structures live in:
 
-## Pipeline model
+- `prompts/system_prompts.py`
 
-Typical end-to-end flow:
+This keeps prompt logic centralized and out of the engine implementations.
 
-```text
-PDF
-  -> JPG pages
-      -> OCR sidecar
-          -> classification sidecar
-          -> extraction sidecar
-```
-
-Typical partial flows:
-
-```text
-JPG -> OCR
-JPG -> classification
-JPG -> extraction
-OCR text -> classification
-OCR text -> extraction
-```
-
-The system does not require all stages to be run together.
-
-## Sidecar outputs
-
-For an input image:
+### Sidecar outputs
+For an input image like:
 
 ```text
 invoice_1.jpg
@@ -90,13 +98,13 @@ invoice_1.classify.txt
 invoice_1.extract.txt
 ```
 
-For an input PDF:
+For an input PDF like:
 
 ```text
 invoice.pdf
 ```
 
-conversion produces:
+conversion generates:
 
 ```text
 invoice_images/invoice_1.jpg
@@ -106,16 +114,17 @@ invoice_images/invoice_2.jpg
 
 ## Why sidecars
 
-Derived artifacts are stored separately instead of mutating source files, embedding metadata into OCR output, or renaming files based on model output.
+Derived artifacts are stored next to their source artifacts instead of:
+- mutating source files
+- embedding metadata into OCR files
+- renaming files based on model output
 
 Benefits:
-
-- raw OCR remains stable
-- classification can be rerun with different label sets
-- extraction can be rerun with different field lists
+- raw OCR stays stable
+- extraction can be rerun with different fields
+- classification can be rerun with different labels
 - debugging is easier
-- artifact provenance stays clear
-- future agentic orchestration becomes simpler
+- downstream tools can reuse outputs
 
 ## Installation
 
@@ -123,7 +132,7 @@ Benefits:
 
 - Python 3.10+
 - Ollama installed locally
-- A local multimodal model available in Ollama, for example `gemma4:e4b`
+- a local multimodal model available in Ollama, for example `gemma4:e4b`
 
 ### Python dependencies
 
@@ -137,142 +146,165 @@ python -m pip install pymupdf ollama
 ollama pull gemma4:e4b
 ```
 
-## CLI usage
+## Running the CLI
+
+You can run the package as a module:
+
+```bash
+python -m document_etl_pipeline --help
+```
 
 ### Convert PDFs to JPG
 
 ```bash
-python app.py "/path/to/folder" --mode convert
+python -m document_etl_pipeline convert --input "/path/to/folder" --recursive --dpi 300
 ```
 
 ### OCR images
 
 ```bash
-python app.py "/path/to/folder" --mode ocr --ocr-output-type txt --doc-hints "invoice,receipt,proof of payment"
+python -m document_etl_pipeline ocr --input "/path/to/folder" --recursive --output-type txt --doc-hints "invoice,receipt,proof of payment"
 ```
 
 ### Classify documents
 
 ```bash
-python app.py "/path/to/folder" --mode classify --class-options "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller"
+python -m document_etl_pipeline classify --input "/path/to/folder" --recursive --class-options "invoice;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller"
 ```
 
 ### Extract fields
 
 ```bash
-python app.py "/path/to/folder" --mode extract --fields "Date,HST,Subtotal,Total,Description"
+python -m document_etl_pipeline extract --input "/path/to/folder" --recursive --fields "Date,HST,Subtotal,Total,Description"
 ```
 
-### Run full pipeline
+## CLI commands
 
-```bash
-python app.py "/path/to/folder" --mode all --doc-hints "invoice,receipt,proof of payment" --class-options "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller" --fields "Date,HST,Subtotal,Total,Description"
-```
+### `convert`
+Converts PDFs into JPG page images.
 
-## CLI options
+#### Input
+- one PDF file, or
+- one folder containing PDFs
 
-### Shared
+#### Main options
+- `--input`
+- `--recursive`
+- `--dpi`
 
-- `folder`  
-  Root folder to scan
+#### Output
+- JPG page images in a `*_images` folder next to the PDF
 
-- `--mode`  
-  One of:
-  - `convert`
-  - `ocr`
-  - `classify`
-  - `extract`
-  - `all`
+### `ocr`
+Runs OCR on JPG/JPEG images.
 
-- `--no-recursive`  
-  Scan only the top-level folder
+#### Input
+- one image file, or
+- one folder containing images
 
-- `--model`  
-  Ollama model name. Default: `gemma4:e4b`
+#### Main options
+- `--input`
+- `--recursive`
+- `--model`
+- `--output-type txt|md`
+- `--doc-hints`
 
-- `--dpi`  
-  PDF render DPI. Default: `300`
+#### Output
+- `name.ocr.txt` or `name.ocr.md`
 
-### OCR
+### `classify`
+Classifies documents using OCR sidecars when available, otherwise falls back to the image.
 
-- `--ocr-output-type txt|md`
-- `--doc-hints "invoice,receipt,proof of payment"`
+#### Input
+- one image file, or
+- one folder containing images
 
-### Classification
+#### Main options
+- `--input`
+- `--recursive`
+- `--model`
+- `--classes`
+- `--class-descriptions`
+- `--ocr-output-type`
 
-- `--class-options "invoice=Vendor-issued billing document;proof_of_payment=Bank statements showing flow of funds or payments made to someone;receipt=Proof of purchase issued by seller"`
+#### Output
+- `name.classify.txt`
 
-Each classification option can be either:
-- `label`
-- `label=description`
+### `extract`
+Extracts caller-defined fields using OCR sidecars when available, otherwise falls back to the image.
 
-### Extraction
+#### Input
+- one image file, or
+- one folder containing images
 
-- `--fields "Date,HST,Subtotal,Total,Description"`
+#### Main options
+- `--input`
+- `--recursive`
+- `--model`
+- `--fields`
+- `--ocr-output-type`
+
+#### Output
+- `name.extract.txt`
 
 ## Prompting strategy
 
 Prompts are intentionally minimal.
 
 Reasons:
-
 - smaller local models often degrade when over-constrained
-- forcing strict JSON output can reduce extraction quality
-- free-form OCR output is easier to inspect and reuse
+- forcing strict JSON output can reduce quality
+- plain text output is easier to inspect and reuse
 
-Prompt construction is centralized in `system_prompts.py`.
+Prompt construction is centralized in `prompts/system_prompts.py`.
 
 ### OCR prompt style
-
 Examples:
-
 - `Transcribe this document as plain text.`
 - `Transcribe this document as markdown.`
 
 With hints:
-
 - `Transcribe this document as plain text. Use the document type hints only as guidance: invoice, receipt, proof of payment.`
 
 ### Classification prompt style
-
 The classifier:
-
 - receives a caller-provided label set
 - may receive optional label descriptions
 - returns only the selected label
 
 ### Extraction prompt style
-
 The extractor:
-
 - receives a caller-provided field list
 - returns plain text only
 - preserves labels exactly as supplied
 - writes `Not found` for missing fields
 
-## Input preference strategy
+## Current design direction
 
-Classifier and extractor use this priority order:
+The current implementation is intentionally simple:
+- engines do the work
+- CLI commands expose each tool clearly
+- coding agents can orchestrate those commands externally
 
-1. prefer OCR sidecar text if present
-2. fall back to the image if OCR is missing
+This keeps the product lightweight while still being useful.
 
-This reduces repeated vision calls and makes partial reruns cheap.
+A future version may add:
+- artifact metadata sidecars
+- reusable pipelines
+- an internal orchestrator
+- YAML-defined workflows
 
-## Object model
+## Intended use with coding agents
 
-The codebase uses class-based stage encapsulation with dataclass-backed configuration objects.
+This repository is being shaped so systems like Claude Code or Codex can invoke it through:
+- atomic CLI commands
+- clear side effects
+- predictable sidecar outputs
+- `SKILL.md` wrappers
 
-Examples:
-
-- `PdfConversionConfig`
-- `OcrConfig`
-- `ClassifierConfig`
-- `ExtractionConfig`
-- `AppConfig`
-- `ClassificationOption`
-
-This keeps stage responsibilities explicit and makes the project easier to extend into a more agentic tool framework.
+The short-term plan is:
+- keep the Python tools simple
+- let the external coding agent act as the orchestrator
 
 ## Dependency footprint
 
@@ -285,21 +317,23 @@ Everything else uses the Python standard library.
 
 ## Current limitations
 
-- OCR quality depends on the chosen local vision model
-- Extraction output is still model-dependent
-- There is no aggregate report builder yet
-- There is no preprocessing for skewed or noisy scans
-- There is no schema validation layer for extraction outputs
+- OCR quality depends on the chosen local model
+- extraction output is still model-dependent
+- there is no built-in orchestration layer yet
+- there is no artifact metadata layer yet
+- there is no formal pipeline registry yet
+- there is no aggregate report builder yet
 
 ## Future directions
 
+- artifact metadata sidecars
+- reusable pipeline definitions
+- internal orchestrator
+- YAML pipeline configs
 - CSV / spreadsheet export
 - image preprocessing
-- retry logic and confidence scoring
-- multiple classifier types
-- report generation
-- planner / agent orchestration
-- tool exposure for code agents such as Claude Code or Codex
+- richer `SKILL.md` wrappers
+- additional document-processing pipelines beyond expenses
 
 ## Naming
 
@@ -309,7 +343,7 @@ Recommended repository name:
 document-etl-pipeline
 ```
 
-Recommended Python package/module namespace:
+Recommended Python package namespace:
 
 ```text
 document_etl_pipeline
